@@ -10,17 +10,21 @@
   let error = $state('');
   let canvas = $state<HTMLCanvasElement | null>(null);
 
+  let runId = 0;
   $effect(() => {
     if (image === null || canvas === null) return;
-    try {
-      const out = renderOps(image, ops);
-      canvas.width = out.width;
-      canvas.height = out.height;
-      canvas.getContext('2d')!.drawImage(out, 0, 0);
-      error = '';
-    } catch {
-      error = 'WebGL недоступен в этом браузере';
-    }
+    const id = ++runId;
+    renderOps(image, ops)
+      .then((out) => {
+        if (id !== runId) return; // a newer render already started
+        canvas!.width = out.width;
+        canvas!.height = out.height;
+        canvas!.getContext('2d')!.drawImage(out, 0, 0);
+        error = '';
+      })
+      .catch(() => {
+        if (id === runId) error = 'WebGL недоступен в этом браузере';
+      });
   });
 
   async function onFile(event: Event) {
@@ -37,9 +41,9 @@
     ops = structuredClone(preset.ops);
   }
 
-  function download() {
+  async function download() {
     if (image === null) return;
-    const out = renderOps(image, ops); // full resolution, same ops
+    const out = await renderOps(image, ops); // full resolution, same ops
     out.toBlob(
       (blob) => {
         if (blob === null) return;

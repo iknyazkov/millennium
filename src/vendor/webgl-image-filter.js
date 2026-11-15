@@ -1,4 +1,5 @@
-/* 
+// @ts-nocheck — vendored upstream code; typed for consumers by the .d.ts beside it
+/*
 WebGLImageFilter - MIT Licensed
 
 2013, Dominic Szablewski - phoboslab.org

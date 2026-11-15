@@ -60,6 +60,28 @@ if (maxDelta === 0) {
   process.exitCode = 1;
 }
 
+// VGA preset proves the async 2D stage end-to-end: downscale must change
+// the display canvas width to exactly 640 (noise + jpeg then run on it)
+await page.getByRole('button', { name: 'Телефон 2003' }).click();
+await page.waitForFunction(() => {
+  const c = document.querySelector('canvas');
+  return c !== null && c.width === 640;
+}, { timeout: 5000 });
+console.log('vga ok: canvas is 640px wide (downscale+noise+jpeg pipeline ran)');
+
+// Screenshots of the three new looks for human eyeballing
+for (const [label, file] of [
+  ['Twin Peaks', 'look-twin-peaks.png'],
+  ['Polaroid SX-70', 'look-polaroid-sx70.png'],
+  ['Телефон 2003', 'look-vga-phone.png'],
+]) {
+  await page.getByRole('button', { name: label }).click();
+  await page.waitForTimeout(500); // async renders incl. jpeg round-trip
+  const box = await page.locator('canvas').boundingBox();
+  if (box === null) throw new Error('canvas vanished before screenshot');
+  await page.screenshot({ path: `artifacts/${file}`, clip: box });
+}
+
 if (errors.length > 0) {
   console.error('CONSOLE ERRORS:\n' + errors.join('\n'));
   process.exitCode = 1;

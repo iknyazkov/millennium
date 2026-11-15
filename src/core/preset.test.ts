@@ -47,6 +47,55 @@ describe('parsePreset (boundary: outside JSON becomes typed or rejected)', () =>
     expect(parsePreset(null)).toBeNull();
   });
 
+  it('accepts a grade op with full params and clamps-free defaults', () => {
+    const full = parsePreset({
+      id: 'a', name: 'x', version: 1,
+      ops: [{ type: 'grade', temp: 0.35, tint: -0.05, lift: 0.25, fade: 0.15 }],
+    });
+    expect(full?.ops[0]).toEqual({ type: 'grade', temp: 0.35, tint: -0.05, lift: 0.25, fade: 0.15 });
+
+    const partial = parsePreset({
+      id: 'a', name: 'x', version: 1,
+      ops: [{ type: 'grade', temp: 0.4 }],
+    });
+    expect(partial?.ops[0]).toEqual({ type: 'grade', temp: 0.4, tint: 0, lift: 0, fade: 0 });
+  });
+
+  it('rejects a grade op with out-of-range temp', () => {
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'grade', temp: 2 }] })).toBeNull();
+  });
+
+  it('accepts blur within 0..10, rejects beyond', () => {
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'blur', radius: 2.5 }] })).not.toBeNull();
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'blur', radius: 11 }] })).toBeNull();
+  });
+
+  it('accepts vignette 0..1, rejects beyond', () => {
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'vignette', amount: 0.4 }] })).not.toBeNull();
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'vignette', amount: 1.4 }] })).toBeNull();
+  });
+
+  it('accepts the vga stack ops and validates their ranges', () => {
+    const preset = parsePreset({
+      id: 'a', name: 'x', version: 1,
+      ops: [
+        { type: 'downscale', width: 640 },
+        { type: 'noise', amount: 0.4, shadow: 0.7 },
+        { type: 'jpeg', quality: 0.25 },
+      ],
+    });
+    expect(preset?.ops).toHaveLength(3);
+
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'downscale', width: 100 }] })).toBeNull();
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'jpeg', quality: 0.01 }] })).toBeNull();
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'noise', amount: 2 }] })).toBeNull();
+  });
+
+  it('noise.shadow defaults to 0.5', () => {
+    const preset = parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'noise', amount: 0.3 }] });
+    expect(preset?.ops[0]).toEqual({ type: 'noise', amount: 0.3, shadow: 0.5 });
+  });
+
   it('clamps hue degrees into [0, 360) instead of rejecting', () => {
     const raw = { id: 'a', name: 'x', version: 1, ops: [{ type: 'hue', degrees: 370 }] };
     expect(parsePreset(raw)?.ops[0]).toEqual({ type: 'hue', degrees: 10 });
