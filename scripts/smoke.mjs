@@ -76,7 +76,35 @@ for (const [label, file] of [
   ['Телефон 2003', 'look-vga-phone.png'],
 ]) {
   await page.getByRole('button', { name: label }).click();
-  await page.waitForTimeout(500); // async renders incl. jpeg round-trip
+  if (label === 'Телефон 2003') {
+    // async 2D stage (jpeg round-trip) — wait for its visible effect, not a timer
+    await page.waitForFunction(
+      () => document.querySelector('canvas')?.width === 640,
+      { timeout: 5000 },
+    );
+  }
+  await page.waitForTimeout(300); // engine-only looks finish in a microtask
+
+  // Orientation guard: the fixture is a lightness ramp (bright top, dark
+  // bottom). A preset must never flip that — the vignette GL pass once did.
+  const bands = await page.evaluate(() => {
+    const c = document.querySelector('canvas');
+    const ctx = c.getContext('2d');
+    const h = Math.max(1, Math.round(c.height * 0.03));
+    const avg = (y) => {
+      const d = ctx.getImageData(0, y, c.width, h).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2];
+      return sum / (d.length / 4) / 3;
+    };
+    return { top: avg(0), bottom: avg(c.height - h) };
+  });
+  console.log(`${label}: top ${bands.top.toFixed(1)} / bottom ${bands.bottom.toFixed(1)} brightness`);
+  if (bands.top <= bands.bottom) {
+    console.error(`FAIL: ${label} flipped the image vertically (top must stay brighter)`);
+    process.exitCode = 1;
+  }
+
   const box = await page.locator('canvas').boundingBox();
   if (box === null) throw new Error('canvas vanished before screenshot');
   await page.screenshot({ path: `artifacts/${file}`, clip: box });
