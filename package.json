@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "smoke": "node scripts/smoke.mjs",
-    "fixture": "node scripts/make-test-image.mjs"
+    "fixture": "node scripts/make-test-image.mjs",
+    "smoke:pwa": "node scripts/smoke-pwa.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
