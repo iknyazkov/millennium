@@ -1,23 +1,107 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Millennium — global styles
+ * Apple-inspired dark theme. Tokens live here once; component styles
+ * reference var(--*) and never hard-code colors.
+ * ───────────────────────────────────────────────────────────────────────── */
+
 :root {
+  /* Surfaces — Apple dark chapters: black canvas, graphite steps */
+  --bg: #000000;
+  --surface: #1d1d1f;
+  --surface-warm: #272729;
+  --surface-raised: #2a2a2c;
+
+  /* Foreground ramp */
+  --fg: #f5f5f7;
+  --fg-2: #d2d2d7;
+  --muted: #86868b;
+  --meta: #6e6e73;
+
+  /* Borders */
+  --border: #424245;
+  --border-soft: #333336;
+
+  /* Accent — Apple Action Blue, hover lifts, press brightens on dark */
+  --accent: #0071e3;
+  --accent-on: #ffffff;
+  --accent-hover: #0077ed;
+  --accent-active: #2997ff;
+
+  --danger: #dc2626;
+
+  /* Typography */
+  --font-display:
+    "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body:
+    "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --text-xs:   12px;
+  --text-sm:   14px;
+  --text-base: 17px;
+  --text-lg:   21px;
+  --text-xl:   28px;
+  --text-3xl:  56px;
+
+  --leading-body:  1.47;
+  --leading-tight: 1.07;
+  --tracking-display: -0.015em;
+
+  /* Spacing, radius, motion */
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   18px;
+  --radius-pill: 980px;
+
+  --elev-ring:   0 0 0 1px var(--border);
+  --elev-raised: 0 12px 32px rgba(0, 0, 0, 0.35);
+
+  --focus-ring: 0 0 0 4px color-mix(in oklab, var(--accent), transparent 55%);
+
+  --motion-fast:   150ms;
+  --ease-standard: cubic-bezier(0.28, 0, 0.22, 1);
+
+  --container-max: 1180px;
+  --container-gutter-desktop: 22px;
+  --container-gutter-phone:   16px;
+
   color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html,
 body {
+  margin: 0;
   min-height: 100%;
 }
 
 body {
-  background: #111;
-  color: #eee;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  font-weight: 400;
+  letter-spacing: -0.022em;
+  -webkit-font-smoothing: antialiased;
 }
 
-* {
-  box-sizing: border-box;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

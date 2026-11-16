@@ -14,11 +14,12 @@ page.on('console', (m) => {
 page.on('pageerror', (e) => errors.push(String(e)));
 
 await page.goto(URL, { waitUntil: 'networkidle' });
-await page.getByText('Выбери фото — оно не покинет это устройство.').waitFor();
+await page.getByText('Фотография не покидает устройство').waitFor();
 
 // Feed the file through the real file chooser, as a user would
+// (the empty-state pill; the nav "Открыть фото" is a label, not a button)
 const chooser = page.waitForEvent('filechooser');
-await page.getByText('Открыть фото').click();
+await page.getByRole('button', { name: 'Открыть фото' }).click();
 (await chooser).setFiles('public/test.png');
 
 await page.locator('canvas').waitFor();

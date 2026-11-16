@@ -9,6 +9,12 @@
   let ops = $state<Op[]>([]);
   let error = $state('');
   let canvas = $state<HTMLCanvasElement | null>(null);
+  let fileInput = $state<HTMLInputElement | null>(null);
+
+  // The active preset, derived — null when the session has no (or a custom) op list.
+  let activeId = $derived(
+    BUILTIN_PRESETS.find((p) => JSON.stringify(p.ops) === JSON.stringify(ops))?.id ?? null,
+  );
 
   let runId = 0;
   $effect(() => {
@@ -59,122 +65,390 @@
   }
 </script>
 
-<header>
-  <h1>Millennium</h1>
-  <label class="open">
-    Открыть фото
-    <input type="file" accept="image/*" onchange={onFile} hidden />
-  </label>
-  {#if image !== null}
-    <button class="primary" onclick={download}>Скачать</button>
+<div class="app">
+  <header class="nav">
+    <div class="nav-inner">
+      <span class="nav-brand">Millennium</span>
+      <div class="nav-actions">
+        <label class="btn btn-ghost" for="file">
+          Открыть фото
+          <input
+            bind:this={fileInput}
+            id="file"
+            type="file"
+            accept="image/*"
+            hidden
+            onchange={onFile}
+          />
+        </label>
+        {#if image !== null}
+          <button class="btn btn-primary" type="button" onclick={download}>Скачать</button>
+        {/if}
+      </div>
+    </div>
+  </header>
+
+  {#if image === null}
+    <section class="empty" aria-label="Начало работы">
+      <div class="empty-inner">
+        <p class="eyebrow">Локальный фото-редактор</p>
+        <h1>Фотография не покидает устройство</h1>
+        <p class="lead">
+          Выбери фото — обработка идёт на GPU прямо в браузере, ничего никуда
+          не загружается.
+        </p>
+        <button class="btn-pill" type="button" onclick={() => fileInput?.click()}>
+          Открыть фото
+          <svg
+            class="od-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      </div>
+    </section>
+  {:else}
+    <div class="editor">
+      <aside class="presets">
+        <h2>Пресеты</h2>
+        <div class="preset-list">
+          {#each BUILTIN_PRESETS as preset (preset.id)}
+            <button
+              class="preset"
+              class:active={activeId === preset.id}
+              type="button"
+              onclick={() => applyPreset(preset)}
+            >
+              {preset.name}
+            </button>
+          {/each}
+        </div>
+      </aside>
+      <main class="stage">
+        <canvas bind:this={canvas} aria-label="Отредактированное фото"></canvas>
+      </main>
+    </div>
   {/if}
-</header>
 
-{#if image === null}
-  <main class="empty">
-    <p>Выбери фото — оно не покинет это устройство.</p>
-  </main>
-{:else}
-  <aside>
-    <h2>Пресеты</h2>
-    {#each BUILTIN_PRESETS as preset (preset.id)}
-      <button class:active={JSON.stringify(ops) === JSON.stringify(preset.ops)} onclick={() => applyPreset(preset)}>
-        {preset.name}
-      </button>
-    {/each}
-  </aside>
-  <main>
-    <canvas bind:this={canvas}></canvas>
-  </main>
-{/if}
-
-{#if error}
-  <footer class="error">{error}</footer>
-{/if}
+  {#if error}
+    <footer class="error" role="alert">
+      <svg
+        class="od-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 9v4M12 17h.01" />
+        <circle cx="12" cy="12" r="9" />
+      </svg>
+      <span>{error}</span>
+    </footer>
+  {/if}
+</div>
 
 <style>
-  :global(body) {
+  .app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100vh;
+  }
+  .app h1,
+  .app h2,
+  .app p {
     margin: 0;
   }
-  header {
+
+  /* ── Frosted top bar ─────────────────────────────────────────── */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in oklab, var(--bg), transparent 25%);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .nav-inner {
+    max-width: var(--container-max);
+    margin-inline: auto;
+    padding-inline: var(--container-gutter-desktop);
+    height: 52px;
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 12px 20px;
+    gap: var(--space-4);
   }
-  h1 {
-    font-size: 20px;
-    margin-right: auto;
+  .nav-brand {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: var(--tracking-display);
+    margin-inline-end: auto;
   }
-  .open,
-  button {
-    font: inherit;
-    padding: 8px 14px;
-    border-radius: 8px;
-    border: 1px solid #444;
-    background: #222;
-    color: #eee;
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  /* ── Buttons: capsule family + compact commerce controls ─────── */
+  .btn,
+  .btn-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    font-family: var(--font-body);
+    line-height: 1.2;
+    letter-spacing: -0.005em;
     cursor: pointer;
+    border: none;
+    transition:
+      background-color var(--motion-fast) var(--ease-standard),
+      color var(--motion-fast) var(--ease-standard),
+      box-shadow var(--motion-fast) var(--ease-standard),
+      transform var(--motion-fast) var(--ease-standard);
   }
-  button.primary {
-    background: #2c5d8f;
+  .btn:active,
+  .btn-pill:active,
+  .preset:active {
+    transform: scale(0.98);
   }
-  aside {
-    padding: 12px 20px;
+  .btn:focus-visible,
+  .btn-pill:focus-visible,
+  .preset:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
-  aside h2 {
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #888;
+  .btn {
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: 500;
   }
-  aside button {
-    display: block;
-    width: 100%;
-    margin-bottom: 8px;
-    text-align: left;
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-on);
   }
-  aside button.active {
-    border-color: #6ea8dd;
+  .btn-ghost {
+    background: transparent;
+    color: var(--fg);
+    box-shadow: var(--elev-ring);
   }
-  main {
-    padding: 0 20px;
+  .btn-pill {
+    padding: 10px 20px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-base);
+    font-weight: 400;
+    background: var(--accent);
+    color: var(--accent-on);
   }
-  main.empty {
+
+  @media (hover: hover) {
+    .btn-primary:hover,
+    .btn-pill:hover {
+      background: var(--accent-hover);
+    }
+    .btn-ghost:hover {
+      background: var(--surface);
+    }
+    .preset:hover:not(.active) {
+      background: var(--surface-raised);
+    }
+  }
+  .btn-primary:active,
+  .btn-pill:active {
+    background: var(--accent-active);
+  }
+
+  /* ── Empty state: cinematic showcase chapter ─────────────────── */
+  .empty {
     display: grid;
     place-items: center;
-    min-height: 60vh;
-    color: #888;
+    padding: var(--space-8) var(--container-gutter-phone);
   }
-  canvas {
+  .empty-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--space-4);
+    max-width: 560px;
+  }
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    line-height: 1;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .empty h1 {
+    font-family: var(--font-display);
+    font-size: clamp(40px, 7vw, var(--text-3xl));
+    font-weight: 600;
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-display);
+  }
+  .lead {
+    font-size: var(--text-lg);
+    line-height: 1.38;
+    color: var(--fg-2);
+    letter-spacing: -0.011em;
+    max-width: 34ch;
+  }
+  .empty .btn-pill {
+    margin-block-start: var(--space-2);
+  }
+
+  /* ── Editor state ────────────────────────────────────────────── */
+  .editor {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+  .presets {
+    border-bottom: 1px solid var(--border-soft);
+    background: color-mix(in oklab, var(--surface), transparent 35%);
+    padding-block: var(--space-3);
+  }
+  .presets h2 {
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    padding-inline: var(--container-gutter-phone);
+    padding-block-end: var(--space-3);
+  }
+  .preset-list {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-inline: var(--container-gutter-phone);
+  }
+  .preset-list::-webkit-scrollbar {
+    display: none;
+  }
+  .preset {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: var(--radius-pill);
+    border: none;
+    background: var(--surface-raised);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color var(--motion-fast) var(--ease-standard),
+      color var(--motion-fast) var(--ease-standard),
+      transform var(--motion-fast) var(--ease-standard);
+  }
+  .preset.active {
+    background: var(--accent);
+    color: var(--accent-on);
+  }
+
+  .stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6) var(--container-gutter-phone);
+    min-height: 0;
+    overflow: hidden;
+  }
+  .stage canvas {
     max-width: 100%;
-    max-height: 70vh;
+    max-height: 100%;
+    border-radius: var(--radius-md);
+    box-shadow: var(--elev-raised);
   }
-  footer.error {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 10px;
-    background: #5b1d1d;
-    color: #fdd;
-  }
+
   @media (min-width: 700px) {
-    :global(body) {
-      display: grid;
-      grid-template-areas:
-        'header header'
-        'sidebar main';
-      grid-template-columns: 220px 1fr;
+    .editor {
+      grid-template-columns: 240px minmax(0, 1fr);
+      grid-template-rows: none;
     }
-    header {
-      grid-area: header;
+    .presets {
+      border-bottom: none;
+      border-inline-end: 1px solid var(--border-soft);
+      padding-block: var(--space-5);
     }
-    aside {
-      grid-area: sidebar;
+    .presets h2 {
+      padding-inline: var(--space-5);
     }
-    main {
-      grid-area: main;
+    .preset-list {
+      flex-direction: column;
+      align-items: stretch;
+      overflow-y: auto;
+      padding-inline: var(--space-5);
+    }
+    .preset {
+      justify-content: flex-start;
+    }
+    .stage {
+      padding: var(--space-8) var(--space-6);
+    }
+  }
+
+  /* ── Error banner ────────────────────────────────────────────── */
+  .error {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--container-gutter-phone);
+    background: color-mix(in oklab, var(--danger), black 55%);
+    color: #f5c2c2;
+    font-size: var(--text-sm);
+    border-top: 1px solid color-mix(in oklab, var(--danger), transparent 60%);
+  }
+  .error :global(.od-icon) {
+    --od-icon-size: 16px;
+    color: #f5a1a1;
+    flex: none;
+  }
+
+  /* Functional inline SVG glyphs own their geometry */
+  .od-icon {
+    display: inline-block;
+    inline-size: var(--od-icon-size, 1em);
+    block-size: var(--od-icon-size, 1em);
+    flex: none;
+  }
+
+  @media (max-width: 639px) {
+    .nav-inner {
+      padding-inline: var(--container-gutter-phone);
+    }
+    .btn-pill {
+      padding: 8px 16px;
+      font-size: var(--text-sm);
     }
   }
 </style>
