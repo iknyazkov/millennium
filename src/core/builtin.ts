@@ -4,34 +4,10 @@ import { parsePreset, type Preset } from './preset';
 
 const RAW_BUILTINS: unknown[] = [
   {
-    id: 'builtin-kodachrome',
-    name: 'Kodachrome',
-    version: 1,
-    ops: [{ type: 'film', film: 'kodachrome' }],
-  },
-  {
     id: 'builtin-polaroid',
     name: 'Polaroid',
     version: 1,
     ops: [{ type: 'film', film: 'polaroid' }],
-  },
-  {
-    id: 'builtin-vintage',
-    name: 'Vintage',
-    version: 1,
-    ops: [
-      { type: 'film', film: 'vintagePinhole' },
-      { type: 'saturation', amount: -0.1 },
-    ],
-  },
-  {
-    id: 'builtin-technicolor',
-    name: 'Technicolor',
-    version: 1,
-    ops: [
-      { type: 'film', film: 'technicolor' },
-      { type: 'brightness', amount: 0.05 },
-    ],
   },
   {
     // Ron Garcia's recipe (THR): warm not teal, shadows shifted
@@ -49,7 +25,8 @@ const RAW_BUILTINS: unknown[] = [
   {
     // SX-70 approximation until the real PictureFX .cube lands: faded
     // contrast, creamy highlights (fade), warm lift, softness + vignette
-    // (DigicamFilter reference: softness 22 / fade 21 / vignette 20).
+    // (DigicamFilter reference: softness 22 / fade 21 / vignette 20) and
+    // the plastic-lens chromatic aberration in the corners.
     id: 'builtin-polaroid-sx70',
     name: 'Polaroid SX-70',
     version: 1,
@@ -57,6 +34,41 @@ const RAW_BUILTINS: unknown[] = [
       { type: 'grade', temp: 0.25, tint: 0.08, lift: 0.12, fade: 0.3 },
       { type: 'blur', radius: 0.8 },
       { type: 'vignette', amount: 0.5 },
+      { type: 'ca', amount: 0.5 },
+    ],
+  },
+  {
+    // From the user's Lightroom XMP: lifted blacks / compressed whites
+    // (composite curve), Exposure +0.30, net-muted greens&oranges, warm
+    // hue drift, Grain 13, PostCrop vignette −10. Skin-friendly softness.
+    id: 'builtin-portra-160',
+    name: 'Portra 160',
+    version: 1,
+    ops: [
+      { type: 'curve', points: [[0, 34], [68, 62], [255, 245]] },
+      { type: 'brightness', amount: 0.06 },
+      { type: 'saturation', amount: -0.08 },
+      { type: 'hue', degrees: -5 },
+      { type: 'vignette', amount: 0.12 },
+      { type: 'noise', amount: 0.12, shadow: 0.6 },
+    ],
+  },
+  {
+    // From the user's Lightroom XMP: per-channel S-curves are the whole
+    // point of Ektar — low-mids pushed apart per channel = saturated
+    // punch — plus strong highlight/shadow compression in the composite.
+    id: 'builtin-ektar-100',
+    name: 'Ektar 100',
+    version: 1,
+    ops: [
+      {
+        type: 'curve',
+        points: [[0, 24], [82, 90], [255, 253]],
+        r: [[0, 0], [44, 11], [70, 38], [96, 88], [147, 179], [191, 223], [255, 255]],
+        g: [[0, 0], [28, 7], [61, 35], [92, 82], [149, 181], [189, 221], [255, 255]],
+        b: [[0, 0], [24, 10], [93, 82], [148, 177], [198, 226], [255, 255]],
+      },
+      { type: 'saturation', amount: 0.06 },
     ],
   },
   {
