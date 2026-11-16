@@ -4,12 +4,6 @@ import { parsePreset, type Preset } from './preset';
 
 const RAW_BUILTINS: unknown[] = [
   {
-    id: 'builtin-polaroid',
-    name: 'Polaroid',
-    version: 1,
-    ops: [{ type: 'film', film: 'polaroid' }],
-  },
-  {
     // Ron Garcia's recipe (THR): warm not teal, shadows shifted
     // yellow-orange (Wratten 85 + LLC), lifted Fuji-style shadows,
     // muted "mysterious, not weird" saturation, soft dreamy blur.

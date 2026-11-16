@@ -16,6 +16,16 @@ page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(URL, { waitUntil: 'networkidle' });
 await page.getByText('Фотография не покидает устройство').waitFor();
 
+// Duplication guard (user-caught twice): exactly ONE open-photo control on
+// screen. Empty state: hero pill only (nav one hides); editor: nav only.
+{
+  const openCount = await page.getByText('Открыть фото').count();
+  if (openCount !== 1) {
+    console.error(`FAIL: ${openCount} "Открыть фото" controls in empty state — expected 1`);
+    process.exitCode = 1;
+  }
+}
+
 // Feed the file through the real file chooser, as a user would
 // (the empty-state pill; the nav "Открыть фото" is a label, not a button)
 const chooser = page.waitForEvent('filechooser');
@@ -31,6 +41,25 @@ await page.waitForFunction(() => {
   const d = c.getContext('2d').getImageData(Math.round(c.width / 2), Math.round(c.height / 2), 1, 1).data;
   return d[0] + d[1] + d[2] > 0;
 });
+
+// Preset-list guard (user-caught): no duplicate looks — "Polaroid" next to
+// "Polaroid SX-70" reads as one preset shipped twice. Names must be unique.
+// Same open-control guard in the editor state (nav label, hero gone).
+{
+  const names = await page.locator('.preset').allTextContents();
+  const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+  if (dupes.length > 0 || names.length === 0) {
+    console.error(`FAIL: preset list has dupes or is empty (${names.length}): ${names.join(' / ')}`);
+    process.exitCode = 1;
+  } else {
+    console.log(`presets ok: ${names.length} unique — ${names.join(' / ')}`);
+  }
+  const openCount = await page.getByText('Открыть фото').count();
+  if (openCount !== 1) {
+    console.error(`FAIL: ${openCount} "Открыть фото" controls in editor — expected 1`);
+    process.exitCode = 1;
+  }
+}
 const sample = () =>
   page.evaluate(() => {
     const c = document.querySelector('canvas');

@@ -70,8 +70,21 @@
     <div class="nav-inner">
       <span class="nav-brand">Millennium</span>
       <div class="nav-actions">
-        <label class="btn btn-ghost" for="file">
-          Открыть фото
+        <!-- Empty state already has its own big "Открыть фото" pill —
+          showing two open controls at once reads as a duplicated button. -->
+        {#if image !== null}
+          <label class="btn btn-ghost" for="file">
+            Открыть фото
+            <input
+              bind:this={fileInput}
+              id="file"
+              type="file"
+              accept="image/*"
+              hidden
+              onchange={onFile}
+            />
+          </label>
+        {:else}
           <input
             bind:this={fileInput}
             id="file"
@@ -80,7 +93,7 @@
             hidden
             onchange={onFile}
           />
-        </label>
+        {/if}
         {#if image !== null}
           <button class="btn btn-primary" type="button" onclick={download}>Скачать</button>
         {/if}
