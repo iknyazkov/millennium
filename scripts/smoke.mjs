@@ -42,12 +42,11 @@ const sample = () =>
   });
 const before = await sample();
 
-await page.getByRole('button', { name: 'Kodachrome' }).click();
+await page.getByRole('button', { name: 'Ektar 100' }).click(); // sync path incl. the curve pass
 await page.waitForTimeout(300); // let the rune effect redraw the canvas
 const after = await sample();
 
 mkdirSync('artifacts', { recursive: true });
-await page.screenshot({ path: 'artifacts/skeleton-kodachrome.png' });
 
 const deltas = before.map((b, i) => b.map((v, ch) => Math.abs(v - after[i][ch])));
 const maxDelta = Math.max(...deltas.flat());
@@ -57,7 +56,7 @@ console.log(
 );
 
 if (maxDelta === 0) {
-  console.error('FAIL: kodachrome did not change canvas pixels');
+  console.error('FAIL: ektar did not change canvas pixels');
   process.exitCode = 1;
 }
 
@@ -70,11 +69,13 @@ await page.waitForFunction(() => {
 }, { timeout: 5000 });
 console.log('vga ok: canvas is 640px wide (downscale+noise+jpeg pipeline ran)');
 
-// Screenshots of the three new looks for human eyeballing
+// Screenshots of the looks for human eyeballing
 for (const [label, file] of [
   ['Twin Peaks', 'look-twin-peaks.png'],
   ['Polaroid SX-70', 'look-polaroid-sx70.png'],
   ['Телефон 2003', 'look-vga-phone.png'],
+  ['Portra 160', 'look-portra-160.png'],
+  ['Ektar 100', 'look-ektar-100.png'],
 ]) {
   await page.getByRole('button', { name: label }).click();
   if (label === 'Телефон 2003') {
@@ -111,11 +112,67 @@ for (const [label, file] of [
   await page.screenshot({ path: `artifacts/${file}`, clip: box });
 }
 
+// Zoomed SX-70 corner for the chromatic-aberration check (R/B fringing
+// must be visible at the photo's edge, not in the center).
+{
+  await page.getByRole('button', { name: 'Polaroid SX-70' }).click();
+  await page.waitForTimeout(400);
+  const box = await page.locator('canvas').boundingBox();
+  if (box === null) throw new Error('canvas vanished before corner shot');
+  const s = 220;
+  await page.screenshot({
+    path: 'artifacts/sx70-corner.png',
+    clip: { x: box.x + box.width - s, y: box.y, width: s, height: s },
+  });
+}
+
+// CA guard: the hue-sweep fixture is too smooth to show fringing, so prove
+// the ca pass geometry on synthetic hard edges. Two vertical white bars on
+// black through ONLY the ca op: near the right edge the radial offset is
+// horizontal (across the bar) → red/blue fringes; through the exact center
+// it is vertical (along the bar) → only sub-pixel leakage. The guard fails
+// if the pass loses its radial growth or its direction.
+{
+  const ca = await page.evaluate(async () => {
+    const { renderOps } = await import('/millennium/src/render/engine.ts');
+    const W = 800, H = 600;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    x.fillStyle = '#000'; x.fillRect(0, 0, W, H);
+    x.strokeStyle = '#fff'; x.lineWidth = 24;
+    x.beginPath(); x.moveTo(700, 100); x.lineTo(700, 300); x.stroke(); // edge bar
+    x.beginPath(); x.moveTo(400, 100); x.lineTo(400, 300); x.stroke(); // center bar
+    const bitmap = await createImageBitmap(c);
+    const out = await renderOps(bitmap, [{ type: 'ca', amount: 0.5 }]);
+    const t = document.createElement('canvas');
+    t.width = out.width; t.height = out.height;
+    t.getContext('2d').drawImage(out, 0, 0);
+    const ctx = t.getContext('2d');
+    const maxRB = (cx) => {
+      let m = 0;
+      for (let px = cx - 45; px <= cx + 45; px++) {
+        const d = ctx.getImageData(px, 200, 1, 1).data;
+        m = Math.max(m, Math.abs(d[0] - d[2]));
+      }
+      return m;
+    };
+    return { edge: Math.round(maxRB(700)), center: Math.round(maxRB(400)), dataUrl: t.toDataURL('image/png') };
+  });
+  console.log(`ca guard: edge |R-B| ${ca.edge}, center |R-B| ${ca.center}`);
+  if (ca.edge < 150 || ca.center > 80) {
+    console.error('FAIL: ca pass lost its radial R/B split (edge must fringe, center must stay clean)');
+    process.exitCode = 1;
+  }
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync('artifacts/ca-stripes.png', Buffer.from(ca.dataUrl.split(',')[1], 'base64'));
+}
+
 if (errors.length > 0) {
   console.error('CONSOLE ERRORS:\n' + errors.join('\n'));
   process.exitCode = 1;
 } else {
-  console.log('smoke ok: photo loaded, kodachrome applied, canvas rendered, console clean');
+  console.log('smoke ok: photo loaded, ektar applied, canvas rendered, console clean');
 }
 
 // Layout guard: photo loaded must not create horizontal scroll, and the
