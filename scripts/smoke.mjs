@@ -89,6 +89,32 @@ if (maxDelta === 0) {
   process.exitCode = 1;
 }
 
+// Intensity guard: the slider dials the applied look — 0% must return the
+// untouched photo, 200% must push the effect past its authored strength.
+{
+  const slider = page.locator('#intensity');
+  await slider.fill('0');
+  await page.waitForTimeout(300);
+  const atZero = await sample();
+  const zeroDelta = Math.max(...before.flatMap((b, i) => b.map((v, ch) => Math.abs(v - atZero[i][ch]))));
+  if (zeroDelta > 2) {
+    console.error(`FAIL: intensity 0% should show the untouched photo, max channel delta ${zeroDelta}`);
+    process.exitCode = 1;
+  }
+  await slider.fill('2');
+  await page.waitForTimeout(300);
+  const atTwo = await sample();
+  const boostDelta = Math.max(...after.flatMap((b, i) => b.map((v, ch) => Math.abs(v - atTwo[i][ch]))));
+  if (boostDelta < 10) {
+    console.error(`FAIL: intensity 200% should strengthen the look, max channel delta ${boostDelta}`);
+    process.exitCode = 1;
+  }
+  console.log(`intensity ok: 0% delta ${zeroDelta} vs original, 200% delta ${boostDelta} vs authored`);
+  // back to authored before the rest of the run
+  await slider.fill('1');
+  await page.waitForTimeout(300);
+}
+
 // VGA preset proves the async 2D stage end-to-end: downscale must change
 // the display canvas width to exactly 640 (noise + jpeg then run on it)
 await page.getByRole('button', { name: 'Телефон 2003' }).click();

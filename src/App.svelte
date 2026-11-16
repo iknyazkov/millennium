@@ -1,5 +1,6 @@
 <script lang="ts">
   import { BUILTIN_PRESETS } from './core/builtin';
+  import { INTENSITY_MAX } from './core/intensity';
   import type { Op, Preset } from './core/preset';
   import { renderOps } from './render/engine';
 
@@ -7,6 +8,7 @@
   // Applying a preset copies its ops in — preset ≡ saved session state.
   let image = $state<ImageBitmap | null>(null);
   let ops = $state<Op[]>([]);
+  let intensity = $state(1); // 0..2, 1 = look as authored
   let error = $state('');
   let canvas = $state<HTMLCanvasElement | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
@@ -20,7 +22,7 @@
   $effect(() => {
     if (image === null || canvas === null) return;
     const id = ++runId;
-    renderOps(image, ops)
+    renderOps(image, ops, intensity)
       .then((out) => {
         if (id !== runId) return; // a newer render already started
         canvas!.width = out.width;
@@ -45,11 +47,12 @@
 
   function applyPreset(preset: Preset) {
     ops = structuredClone(preset.ops);
+    intensity = 1; // a fresh look starts at its authored strength
   }
 
   async function download() {
     if (image === null) return;
-    const out = await renderOps(image, ops); // full resolution, same ops
+    const out = await renderOps(image, ops, intensity); // full resolution, same ops
     out.toBlob(
       (blob) => {
         if (blob === null) return;
@@ -142,6 +145,19 @@
               {preset.name}
             </button>
           {/each}
+        </div>
+        <div class="intensity" class:disabled={ops.length === 0}>
+          <label class="intensity-label" for="intensity">Интенсивность</label>
+          <input
+            id="intensity"
+            type="range"
+            min="0"
+            max={INTENSITY_MAX}
+            step="0.01"
+            bind:value={intensity}
+            disabled={ops.length === 0}
+          />
+          <span class="intensity-value">{Math.round(intensity * 100)}%</span>
         </div>
       </aside>
       <main class="stage">
@@ -391,6 +407,42 @@
     color: var(--accent-on);
   }
 
+  /* ── Intensity slider: dials the applied look 0..200% ────────── */
+  .intensity {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding-inline: var(--container-gutter-phone);
+    padding-block-start: var(--space-3);
+  }
+  .intensity.disabled {
+    opacity: 0.45;
+  }
+  .intensity-label {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    color: var(--muted);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .intensity-value {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-2);
+    min-width: 4ch;
+    text-align: end;
+  }
+  .intensity input[type='range'] {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .intensity.disabled input[type='range'] {
+    cursor: default;
+  }
+
   .stage {
     display: grid;
     grid-template-columns: minmax(0, 1fr); /* definite width for the frame's 100% */
@@ -432,6 +484,10 @@
     }
     .presets h2 {
       padding-inline: var(--space-5);
+    }
+    .intensity {
+      padding-inline: var(--space-5);
+      padding-block-start: var(--space-4);
     }
     .preset-list {
       flex-direction: column;

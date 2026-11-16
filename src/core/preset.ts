@@ -39,7 +39,8 @@ export type Op =
   | { type: 'ca'; amount: number } // 0..1, radial chromatic aberration
   | { type: 'downscale'; width: number } // 320..4096 px
   | { type: 'noise'; amount: number; shadow: number } // both 0..1
-  | { type: 'jpeg'; quality: number }; // 0.05..0.95
+  | { type: 'jpeg'; quality: number } // 0.05..0.95
+  | { type: 'colorMatrix'; matrix: number[] }; // raw 5x4 engine matrix (intensity-scaled films land here)
 
 export type Preset = {
   id: string;
@@ -170,6 +171,13 @@ export function parsePreset(raw: unknown): Preset | null {
     if (o.type === 'jpeg') {
       if (typeof o.quality !== 'number' || !inRange(o.quality, 0.05, 0.95)) return null;
       parsedOps.push({ type: 'jpeg', quality: o.quality });
+      continue;
+    }
+
+    if (o.type === 'colorMatrix') {
+      if (!Array.isArray(o.matrix) || o.matrix.length !== 20) return null;
+      if (!o.matrix.every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
+      parsedOps.push({ type: 'colorMatrix', matrix: o.matrix });
       continue;
     }
 
