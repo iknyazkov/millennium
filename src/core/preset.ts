@@ -2,6 +2,8 @@
 // Glossary: Preset = named op-list (user artifact); Op = one operation;
 // "film" ops map 1:1 to WebGLImageFilter's baked recipes.
 
+import type { CurvePoints } from './curve';
+
 export const PRESET_SCHEMA_VERSION = 1;
 
 export const FILM_NAMES = [
@@ -31,8 +33,10 @@ export type Op =
   | { type: 'hue'; degrees: number }
   | { type: 'film'; film: FilmName }
   | GradeOp
+  | { type: 'curve'; points: CurvePoints; r?: CurvePoints; g?: CurvePoints; b?: CurvePoints }
   | { type: 'blur'; radius: number } // 0..10 px
   | { type: 'vignette'; amount: number } // 0..1
+  | { type: 'ca'; amount: number } // 0..1, radial chromatic aberration
   | { type: 'downscale'; width: number } // 320..4096 px
   | { type: 'noise'; amount: number; shadow: number } // both 0..1
   | { type: 'jpeg'; quality: number }; // 0.05..0.95
@@ -54,6 +58,21 @@ function isFilmName(v: unknown): v is FilmName {
 
 function inRange(v: unknown, lo: number, hi: number): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+}
+
+/** XMP-style control points: [in,out] ints 0..255, in strictly rising, 0..255 span. */
+function isCurvePoints(v: unknown): v is CurvePoints {
+  if (!Array.isArray(v) || v.length < 2) return false;
+  let prevIn = -1;
+  for (const p of v) {
+    if (!Array.isArray(p) || p.length !== 2) return false;
+    const [x, y] = p;
+    if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
+    if (!inRange(x, 0, 255) || !inRange(y, 0, 255)) return false;
+    if (x <= prevIn) return false;
+    prevIn = x;
+  }
+  return v[0][0] === 0 && v[v.length - 1][0] === 255;
 }
 
 /**
@@ -104,6 +123,22 @@ export function parsePreset(raw: unknown): Preset | null {
       if (!inRange(temp, -1, 1) || !inRange(tint, -1, 1)) return null;
       if (!inRange(lift, 0, 1) || !inRange(fade, 0, 1)) return null;
       parsedOps.push({ type: 'grade', temp, tint, lift, fade });
+      continue;
+    }
+
+    if (o.type === 'curve') {
+      if (!isCurvePoints(o.points)) return null;
+      const r = o.r === undefined ? undefined : isCurvePoints(o.r) ? o.r : null;
+      const g = o.g === undefined ? undefined : isCurvePoints(o.g) ? o.g : null;
+      const b = o.b === undefined ? undefined : isCurvePoints(o.b) ? o.b : null;
+      if (r === null || g === null || b === null) return null;
+      parsedOps.push({ type: 'curve', points: o.points, r, g, b });
+      continue;
+    }
+
+    if (o.type === 'ca') {
+      if (!inRange(o.amount, 0, 1)) return null;
+      parsedOps.push({ type: 'ca', amount: o.amount });
       continue;
     }
 

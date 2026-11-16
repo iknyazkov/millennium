@@ -100,6 +100,34 @@ describe('parsePreset (boundary: outside JSON becomes typed or rejected)', () =>
     const raw = { id: 'a', name: 'x', version: 1, ops: [{ type: 'hue', degrees: 370 }] };
     expect(parsePreset(raw)?.ops[0]).toEqual({ type: 'hue', degrees: 10 });
   });
+
+  it('accepts a curve op with valid points, keeps optional channels', () => {
+    const raw = {
+      id: 'a', name: 'x', version: 1,
+      ops: [{ type: 'curve', points: [[0, 34], [68, 62], [255, 245]], r: [[0, 0], [255, 255]] }],
+    };
+    expect(parsePreset(raw)?.ops[0]).toEqual({
+      type: 'curve',
+      points: [[0, 34], [68, 62], [255, 245]],
+      r: [[0, 0], [255, 255]],
+      g: undefined, b: undefined,
+    });
+  });
+
+  it('rejects malformed curve points', () => {
+    const base = { id: 'a', name: 'x', version: 1 };
+    expect(parsePreset({ ...base, ops: [{ type: 'curve', points: [[0, 10]] }] })).toBeNull(); // < 2 points
+    expect(parsePreset({ ...base, ops: [{ type: 'curve', points: [[10, 0], [255, 255]] }] })).toBeNull(); // must start at 0
+    expect(parsePreset({ ...base, ops: [{ type: 'curve', points: [[0, 0], [200, 255]] }] })).toBeNull(); // must end at 255
+    expect(parsePreset({ ...base, ops: [{ type: 'curve', points: [[0, 0], [0, 10], [255, 255]] }] })).toBeNull(); // rising ins
+    expect(parsePreset({ ...base, ops: [{ type: 'curve', points: [[0, 0], [256, 255]] }] })).toBeNull(); // out of byte range
+    expect(parsePreset({ ...base, ops: [{ type: 'curve', points: [[0, 0], [128, 300], [255, 255]] }] })).toBeNull();
+  });
+
+  it('accepts ca 0..1, rejects beyond', () => {
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'ca', amount: 0.5 }] })).not.toBeNull();
+    expect(parsePreset({ id: 'a', name: 'x', version: 1, ops: [{ type: 'ca', amount: 1.2 }] })).toBeNull();
+  });
 });
 
 describe('serializePreset', () => {
