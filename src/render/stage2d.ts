@@ -9,13 +9,24 @@ export async function run2DStage(
   source: HTMLCanvasElement,
   ops: Op2D[],
 ): Promise<HTMLCanvasElement> {
-  let canvas = source;
+  // The source may be a WebGL canvas (own GL passes) — its getContext('2d')
+  // is null forever. Copy through a 2D canvas once, then work in 2D.
+  let canvas = ensure2D(source);
   for (const op of ops) {
     if (op.type === 'downscale') canvas = downscale(canvas, op.width);
     else if (op.type === 'noise') addNoise(canvas, op.amount, op.shadow);
     else canvas = await jpegReencode(canvas, op.quality);
   }
   return canvas;
+}
+
+function ensure2D(source: HTMLCanvasElement): HTMLCanvasElement {
+  if (source.getContext('2d') !== null) return source;
+  const copy = document.createElement('canvas');
+  copy.width = source.width;
+  copy.height = source.height;
+  copy.getContext('2d')!.drawImage(source, 0, 0);
+  return copy;
 }
 
 /** Never upscales: width >= current width is a no-op. */

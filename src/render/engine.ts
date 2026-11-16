@@ -1,13 +1,13 @@
 // Render pipeline: interprets the core Op list across three stages.
 // Stage order is FIXED (documented contract of the op-list):
 //   1. WebGL engine — color matrices (amount/hue/film/grade) + blur, in listed order
-//   2. Own GL passes — vignette (LUT will join here)
+//   2. Own GL passes — tone curves, vignette, chromatic aberration
 //   3. 2D stage — downscale/noise/jpeg, in listed order
 // Ops keep their relative order WITHIN a stage; a preset expresses a look,
 // not a strict global sequence.
 import { gradeToMatrix } from '../core/grade';
 import type { Op } from '../core/preset';
-import { applyVignette } from './passes';
+import { applyCA, applyCurves, applyVignette } from './passes';
 import { run2DStage } from './stage2d';
 import '../vendor/webgl-image-filter.js';
 
@@ -78,9 +78,19 @@ export async function renderOps(image: TexImageSource, ops: Op[]): Promise<HTMLC
   const engineOps = ops.filter(isEngineOp);
   let canvas = engineOps.length > 0 ? applyEngine(image, engineOps) : identityCanvas(image);
 
+  const curve = ops.find((op) => op.type === 'curve');
+  if (curve && curve.type === 'curve') {
+    canvas = applyCurves(canvas, curve);
+  }
+
   const vignette = ops.find((op) => op.type === 'vignette');
   if (vignette && vignette.type === 'vignette') {
     canvas = applyVignette(canvas, vignette.amount);
+  }
+
+  const ca = ops.find((op) => op.type === 'ca');
+  if (ca && ca.type === 'ca') {
+    canvas = applyCA(canvas, ca.amount);
   }
 
   const ops2D = ops.filter(is2DOp);
