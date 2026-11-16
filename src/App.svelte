@@ -132,7 +132,9 @@
         </div>
       </aside>
       <main class="stage">
-        <canvas bind:this={canvas} aria-label="Отредактированное фото"></canvas>
+        <div class="frame">
+          <canvas bind:this={canvas} aria-label="Отредактированное фото"></canvas>
+        </div>
       </main>
     </div>
   {/if}
@@ -160,8 +162,10 @@
 <style>
   .app {
     display: grid;
+    grid-template-columns: minmax(0, 1fr); /* explicit: implicit auto tracks size to content */
     grid-template-rows: auto minmax(0, 1fr);
     height: 100vh;
+    height: 100dvh; /* phone Safari: vh ignores the collapsed URL bar */
   }
   .app h1,
   .app h2,
@@ -313,9 +317,13 @@
   }
 
   /* ── Editor state ────────────────────────────────────────────── */
+  /* Phone: presets strip on top (auto), stage takes what's left.
+   * One row for two children left the stage in an implicit row and
+   * the canvas' natural width ripped the page into horizontal scroll. */
   .editor {
     display: grid;
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     min-height: 0;
   }
   .presets {
@@ -371,24 +379,38 @@
   }
 
   .stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr); /* definite width for the frame's 100% */
+    grid-template-rows: minmax(0, 1fr);
+    place-items: center;
+    padding: var(--space-6) var(--container-gutter-phone);
+    min-height: 0;
+    min-width: 0; /* grid item must be allowed to shrink below content */
+  }
+  /* Constant photo area: fixed design size, shrinks only when the
+   * viewport can't hold it. The photo fits inside by its own aspect
+   * ratio — the frame never stretches to the screen. */
+  .frame {
+    width: min(880px, 100%);
+    height: min(660px, 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--space-6) var(--container-gutter-phone);
-    min-height: 0;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--elev-raised);
     overflow: hidden;
   }
-  .stage canvas {
+  .frame canvas {
+    display: block;
     max-width: 100%;
     max-height: 100%;
-    border-radius: var(--radius-md);
-    box-shadow: var(--elev-raised);
   }
 
   @media (min-width: 700px) {
     .editor {
       grid-template-columns: 240px minmax(0, 1fr);
-      grid-template-rows: none;
+      grid-template-rows: minmax(0, 1fr);
     }
     .presets {
       border-bottom: none;

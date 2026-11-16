@@ -117,4 +117,46 @@ if (errors.length > 0) {
 } else {
   console.log('smoke ok: photo loaded, kodachrome applied, canvas rendered, console clean');
 }
+
+// Layout guard: photo loaded must not create horizontal scroll, and the
+// canvas must stay inside the viewport — on desktop AND phone widths.
+// (Once broke: one grid row for two editor children pushed the stage into
+// an implicit row, canvas' natural 1200px width ripped the page open.)
+for (const [name, viewport] of [
+  ['desktop', { width: 1100, height: 800 }],
+  ['phone', { width: 390, height: 844 }],
+]) {
+  const page2 = await browser.newPage({ viewport });
+  await page2.goto(URL, { waitUntil: 'networkidle' });
+  const chooser2 = page2.waitForEvent('filechooser');
+  await page2.getByRole('button', { name: 'Открыть фото' }).click();
+  (await chooser2).setFiles('public/test.png');
+  await page2.waitForFunction(() => {
+    const c = document.querySelector('canvas');
+    if (!c) return false;
+    const d = c.getContext('2d').getImageData(c.width / 2 | 0, c.height / 2 | 0, 1, 1).data;
+    return d[0] + d[1] + d[2] > 0;
+  });
+  const layout = await page2.evaluate(() => {
+    const de = document.documentElement;
+    const c = document.querySelector('canvas');
+    const r = c.getBoundingClientRect();
+    return {
+      scrollW: de.scrollWidth,
+      innerW: window.innerWidth,
+      canvasRight: Math.round(r.right),
+      canvasBottom: Math.round(r.bottom),
+    };
+  });
+  const ok = layout.scrollW <= layout.innerW + 1 && layout.canvasRight <= layout.innerW + 1;
+  console.log(
+    `layout ${name}: scrollW ${layout.scrollW}/${layout.innerW}, canvas right ${layout.canvasRight}, bottom ${layout.canvasBottom}`,
+  );
+  if (!ok) {
+    console.error(`FAIL: ${name} layout — horizontal overflow with photo loaded`);
+    process.exitCode = 1;
+  }
+  await page2.close();
+}
+
 await browser.close();
